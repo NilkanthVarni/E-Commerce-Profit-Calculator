@@ -4,226 +4,291 @@ import streamlit as st
 st.set_page_config(
     page_title="E-Commerce Profit Calculator",
     page_icon="📦",
-    layout="wide"
+    layout="centered"
 )
 
-# Custom CSS for better styling
+# Custom CSS
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
+    .main {
+        padding: 2rem;
+    }
+    .stNumberInput input {
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+    .profit-positive {
+        color: #10b981;
         font-weight: bold;
+        font-size: 1.5rem;
+    }
+    .profit-negative {
+        color: #ef4444;
+        font-weight: bold;
+        font-size: 1.5rem;
+    }
+    h1 {
         color: #1f2937;
-        margin-bottom: 0.5rem;
+        font-weight: 700;
     }
-    .sub-header {
-        font-size: 1rem;
-        color: #6b7280;
-        margin-bottom: 2rem;
+    h3 {
+        color: #374151;
+        font-weight: 600;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
     }
-    .metric-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .stButton>button {
-        width: 100%;
+    .stSelectbox label, .stNumberInput label {
+        font-weight: 600;
+        color: #4b5563;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Currency exchange rates (base: USD)
 CURRENCY_RATES = {
-    "USD": 1.0, "EUR": 0.92, "GBP": 0.79, "INR": 83.12, "JPY": 149.50,
-    "CNY": 7.24, "AUD": 1.52, "CAD": 1.36, "SGD": 1.34, "AED": 3.67
+    "USD": 1.0,
+    "EUR": 0.92,
+    "GBP": 0.79,
+    "INR": 83.12,
+    "JPY": 149.50,
+    "CNY": 7.24,
+    "AUD": 1.52,
+    "CAD": 1.36,
+    "SGD": 1.34,
+    "AED": 3.67
 }
-
-# Courier services
-COURIER_SERVICES = {
-    "India Post": {"rate": 2.5, "desc": "Most budget-friendly"},
-    "EMS": {"rate": 8.0, "desc": "Postal express service"},
-    "Aramex": {"rate": 10.0, "desc": "Middle East & Asia"},
-    "UPS Worldwide": {"rate": 13.8, "desc": "Global network"},
-    "FedEx International": {"rate": 14.5, "desc": "Reliable delivery"},
-    "DHL Express": {"rate": 15.0, "desc": "Fastest shipping"}
-}
-
-def convert_currency(amount, from_curr, to_curr="USD"):
-    if from_curr == to_curr:
-        return amount
-    return (amount / CURRENCY_RATES[from_curr]) * CURRENCY_RATES[to_curr]
-
-def calculate_shipping(weight_kg, courier):
-    rate = COURIER_SERVICES[courier]["rate"]
-    if weight_kg <= 1:
-        return rate * weight_kg
-    elif weight_kg <= 5:
-        return rate * weight_kg * 1.1
-    elif weight_kg <= 10:
-        return rate * weight_kg * 1.2
-    return rate * weight_kg * 1.3
 
 # Header
-st.markdown('<div class="main-header">📦 E-Commerce Profit Calculator</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Calculate profits with multi-currency, shipping, and percentage-based customs duties</div>', unsafe_allow_html=True)
+st.title("📦 E-Commerce Profit Calculator")
+st.markdown("**Professional profit/loss calculator for e-commerce businesses**")
+st.markdown("---")
 
-# Main layout
-col1, col2 = st.columns([1, 1], gap="large")
+# Currency Selection
+st.markdown("### 💱 Currency")
+currency = st.selectbox(
+    "Select your currency (applies to all fields)",
+    list(CURRENCY_RATES.keys()),
+    index=3,  # Default to INR
+    help="This currency will be used for base price, selling price, and delivery charges"
+)
 
-with col1:
-    # Product Information
-    st.markdown("### 📋 Product Information")
+st.markdown("---")
+
+# Product Base Price
+st.markdown("### 💰 Base Product Price")
+base_price = st.number_input(
+    f"Enter base product cost ({currency})",
+    min_value=0.0,
+    value=100.0,
+    step=10.0,
+    format="%.2f"
+)
+
+# Delivery Charges
+st.markdown("### 🚚 Delivery Charges")
+delivery_charge = st.number_input(
+    f"Enter shipping/delivery cost ({currency})",
+    min_value=0.0,
+    value=50.0,
+    step=5.0,
+    format="%.2f",
+    help="Total cost to ship this product to the final destination"
+)
+
+# Custom Duties/Tariffs
+st.markdown("### 🌍 Custom Duties & Tariffs")
+st.info("💡 Enter tariff as **percentage (%)** of base product price")
+
+num_legs = st.number_input(
+    "Number of transit legs",
+    min_value=1,
+    max_value=10,
+    value=1,
+    step=1,
+    help="Example: China → India → USA = 2 legs"
+)
+
+tariff_legs = []
+total_tariff_amount = 0
+
+for i in range(num_legs):
+    st.markdown(f"#### Leg {i+1}")
     
-    prod_curr = st.selectbox("💱 Product Currency", list(CURRENCY_RATES.keys()), index=3)
-    prod_price = st.number_input(f"💰 Base Product Price ({prod_curr})", min_value=0.0, value=100.0, step=10.0)
+    col1, col2, col3 = st.columns([2, 2, 1])
     
-    st.markdown("**Weight**")
-    weight_cols = st.columns([1, 2])
-    with weight_cols[0]:
-        weight_unit = st.radio("Unit", ["kg", "g"], horizontal=True, label_visibility="collapsed")
-    with weight_cols[1]:
-        weight_val = st.number_input(
-            "Weight value", 
-            min_value=0.0, 
-            value=500.0 if weight_unit == "g" else 0.5, 
-            step=10.0 if weight_unit == "g" else 0.1,
-            label_visibility="collapsed"
+    with col1:
+        from_country = st.text_input(
+            "From",
+            value=f"Country {chr(65+i)}",
+            key=f"from_{i}"
         )
     
-    weight_kg = weight_val / 1000 if weight_unit == "g" else weight_val
+    with col2:
+        to_country = st.text_input(
+            "To",
+            value=f"Country {chr(66+i)}",
+            key=f"to_{i}"
+        )
     
-    st.markdown("---")
+    with col3:
+        tariff_pct = st.number_input(
+            "Tariff %",
+            min_value=0.0,
+            max_value=100.0,
+            value=10.0,
+            step=0.5,
+            format="%.2f",
+            key=f"tariff_{i}"
+        )
     
-    # Shipping
-    st.markdown("### 🚚 Shipping Details")
-    courier = st.selectbox("📦 Courier Service", list(COURIER_SERVICES.keys()))
-    st.caption(f"💡 {COURIER_SERVICES[courier]['desc']}")
+    # Calculate tariff amount in selected currency
+    tariff_amount = base_price * (tariff_pct / 100)
+    total_tariff_amount += tariff_amount
+    
+    st.caption(f"💵 {from_country} → {to_country}: **{tariff_pct}%** = **{tariff_amount:.2f} {currency}**")
+    
+    tariff_legs.append({
+        "from": from_country,
+        "to": to_country,
+        "percentage": tariff_pct,
+        "amount": tariff_amount
+    })
+    
+    if i < num_legs - 1:
+        st.markdown("---")
 
-with col2:
-    # Tariffs
-    st.markdown("### 🌍 Customs Duties & Tariffs")
-    st.info("💡 Tariffs are **percentage (%)** of product base price")
-    
-    num_legs = st.number_input("🔢 Number of Transit Legs", min_value=1, max_value=10, value=1, step=1)
-    
-    tariff_legs = []
-    prod_price_usd = convert_currency(prod_price, prod_curr)
-    total_tariffs_usd = 0
-    
-    for i in range(num_legs):
-        with st.expander(f"**Leg {i+1}** Details", expanded=True):
-            tc1, tc2 = st.columns(2)
-            with tc1:
-                from_country = st.text_input("From", value=f"Country {chr(65+i)}", key=f"from_{i}", label_visibility="collapsed", placeholder="From Country")
-            with tc2:
-                to_country = st.text_input("To", value=f"Country {chr(66+i)}", key=f"to_{i}", label_visibility="collapsed", placeholder="To Country")
-            
-            tariff_pct = st.slider(
-                f"Tariff Rate (%)", 
-                min_value=0.0, 
-                max_value=100.0, 
-                value=10.0, 
-                step=0.5,
-                key=f"tariff_{i}"
-            )
-            
-            tariff_amt = prod_price_usd * (tariff_pct / 100)
-            total_tariffs_usd += tariff_amt
-            
-            st.caption(f"💵 {from_country} → {to_country}: **${tariff_amt:.2f}** ({tariff_pct}% of ${prod_price_usd:.2f})")
-            
-            tariff_legs.append({
-                "from": from_country,
-                "to": to_country,
-                "pct": tariff_pct,
-                "amt_usd": tariff_amt
-            })
-    
-    st.markdown("---")
-    
-    # Selling Price
-    st.markdown("### 💵 Selling Price")
-    sell_curr = st.selectbox("💱 Selling Currency", list(CURRENCY_RATES.keys()), index=3)
-    sell_price = st.number_input(f"💰 Your Selling Price ({sell_curr})", min_value=0.0, value=200.0, step=10.0)
-
-# Calculations
 st.markdown("---")
+
+# Selling Price
+st.markdown("### 💵 Selling Price")
+selling_price = st.number_input(
+    f"Your selling price ({currency})",
+    min_value=0.0,
+    value=200.0,
+    step=10.0,
+    format="%.2f",
+    help="The price at which you will sell this product"
+)
+
+st.markdown("---")
+st.markdown("---")
+
+# CALCULATIONS
+total_cost = base_price + delivery_charge + total_tariff_amount
+profit_loss = selling_price - total_cost
+profit_loss_percentage = (profit_loss / selling_price * 100) if selling_price > 0 else 0
+profit_multiple = profit_loss / base_price if base_price > 0 else 0
+
+# Results Section
 st.markdown("## 📊 Profit/Loss Analysis")
 
-shipping_usd = calculate_shipping(weight_kg, courier)
-sell_price_usd = convert_currency(sell_price, sell_curr)
-total_cost = prod_price_usd + shipping_usd + total_tariffs_usd
-profit = sell_price_usd - total_cost
-margin_pct = (profit / sell_price_usd * 100) if sell_price_usd > 0 else 0
+# Main metrics in colored boxes
+col1, col2, col3 = st.columns(3)
 
-# Results
-res_cols = st.columns(4)
-
-with res_cols[0]:
+with col1:
     st.metric(
-        "💸 Total Cost",
-        f"${total_cost:.2f}",
-        help="Product + Shipping + Tariffs"
-    )
-    st.caption(f"Product: ${prod_price_usd:.2f}")
-    st.caption(f"Shipping: ${shipping_usd:.2f}")
-    st.caption(f"Tariffs: ${total_tariffs_usd:.2f}")
-
-with res_cols[1]:
-    st.metric(
-        "💰 Selling Price",
-        f"${sell_price_usd:.2f}",
-        help=f"{sell_price:.2f} {sell_curr}"
+        label="💸 Total Cost",
+        value=f"{total_cost:.2f} {currency}",
+        help="Base Price + Delivery + Tariffs"
     )
 
-with res_cols[2]:
+with col2:
     st.metric(
-        "📈 Profit/Loss",
-        f"${profit:.2f}",
-        delta=f"{margin_pct:.1f}%",
-        delta_color="normal" if profit >= 0 else "inverse"
+        label="💰 Selling Price",
+        value=f"{selling_price:.2f} {currency}"
     )
 
-with res_cols[3]:
-    margin_status = "🟢 Healthy" if margin_pct >= 20 else "🟡 Moderate" if margin_pct >= 10 else "🔴 Low"
+with col3:
+    profit_color = "normal" if profit_loss >= 0 else "inverse"
     st.metric(
-        "📊 Profit Margin",
-        f"{margin_pct:.1f}%",
-        help=margin_status
+        label="📈 Profit/Loss",
+        value=f"{profit_loss:.2f} {currency}",
+        delta=f"{profit_loss_percentage:.2f}%",
+        delta_color=profit_color
     )
-    st.caption(margin_status)
 
 # Detailed breakdown
 st.markdown("---")
-with st.expander("📋 **Detailed Cost Breakdown**"):
-    st.markdown("#### 🌍 Tariff Route")
-    for i, leg in enumerate(tariff_legs):
-        st.write(f"**Leg {i+1}:** {leg['from']} → {leg['to']} | {leg['pct']}% = ${leg['amt_usd']:.2f}")
-    
-    st.markdown("#### 💵 Cost Summary (USD)")
-    st.write(f"• Base Product: **${prod_price_usd:.2f}**")
-    st.write(f"• Shipping ({courier}): **${shipping_usd:.2f}**")
-    st.write(f"• Total Tariffs: **${total_tariffs_usd:.2f}**")
-    st.write(f"• **TOTAL COST: ${total_cost:.2f}**")
-    st.write(f"• Selling Price: **${sell_price_usd:.2f}**")
-    
-    profit_color = "green" if profit >= 0 else "red"
-    st.markdown(f"• **NET PROFIT/LOSS:** :{profit_color}[**${profit:.2f}** ({margin_pct:.1f}%)]")
+st.markdown("### 📋 Detailed Breakdown")
 
-# Insights
-if margin_pct < 10:
-    st.warning("⚠️ **Low Profit Margin** - Consider increasing your selling price or finding cheaper shipping/tariff routes")
-elif margin_pct < 20:
-    st.info("💡 **Moderate Margin** - You have room for optimization. Try negotiating better shipping rates or tariffs")
+breakdown_col1, breakdown_col2 = st.columns(2)
+
+with breakdown_col1:
+    st.markdown("**Cost Components:**")
+    st.write(f"• Base Product Price: **{base_price:.2f} {currency}**")
+    st.write(f"• Delivery Charges: **{delivery_charge:.2f} {currency}**")
+    st.write(f"• Total Custom Duties: **{total_tariff_amount:.2f} {currency}**")
+    st.markdown(f"**Total Cost: {total_cost:.2f} {currency}**")
+
+with breakdown_col2:
+    st.markdown("**Tariff Route:**")
+    for i, leg in enumerate(tariff_legs):
+        st.write(f"• Leg {i+1}: {leg['from']} → {leg['to']}")
+        st.write(f"  {leg['percentage']}% = {leg['amount']:.2f} {currency}")
+
+# Profit Analysis
+st.markdown("---")
+st.markdown("### 💡 Profit Analysis")
+
+analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
+
+with analysis_col1:
+    profit_class = "profit-positive" if profit_loss >= 0 else "profit-negative"
+    st.markdown(f"**Profit/Loss Amount:**")
+    st.markdown(f"<div class='{profit_class}'>{profit_loss:+.2f} {currency}</div>", unsafe_allow_html=True)
+
+with analysis_col2:
+    st.markdown("**Profit/Loss Percentage:**")
+    pct_class = "profit-positive" if profit_loss_percentage >= 0 else "profit-negative"
+    st.markdown(f"<div class='{pct_class}'>{profit_loss_percentage:+.2f}%</div>", unsafe_allow_html=True)
+
+with analysis_col3:
+    st.markdown("**Profit Multiple:**")
+    mult_class = "profit-positive" if profit_multiple >= 0 else "profit-negative"
+    st.markdown(f"<div class='{mult_class}'>{profit_multiple:+.2f}x</div>", unsafe_allow_html=True)
+    st.caption("(Profit as multiple of base price)")
+
+# Formula explanation
+with st.expander("📐 Calculation Formula"):
+    st.markdown("""
+    **Profit/Loss Calculation:**
+    
+    ```
+    Total Cost = Base Price + Delivery Charge + Custom Duties
+    Total Cost = {:.2f} + {:.2f} + {:.2f} = {:.2f} {}
+    
+    Profit/Loss = Selling Price - Total Cost
+    Profit/Loss = {:.2f} - {:.2f} = {:.2f} {}
+    
+    Profit Percentage = (Profit/Loss ÷ Selling Price) × 100
+    Profit Percentage = ({:.2f} ÷ {:.2f}) × 100 = {:.2f}%
+    
+    Profit Multiple = Profit/Loss ÷ Base Price
+    Profit Multiple = {:.2f} ÷ {:.2f} = {:.2f}x
+    ```
+    """.format(
+        base_price, delivery_charge, total_tariff_amount, total_cost, currency,
+        selling_price, total_cost, profit_loss, currency,
+        profit_loss, selling_price, profit_loss_percentage,
+        profit_loss, base_price, profit_multiple
+    ))
+
+# Recommendations
+st.markdown("---")
+if profit_loss < 0:
+    st.error(f"⚠️ **Loss Alert**: You're losing **{abs(profit_loss):.2f} {currency}** per unit. Consider increasing your selling price or reducing costs.")
+elif profit_loss_percentage < 10:
+    st.warning(f"💡 **Low Margin**: Your profit margin is only **{profit_loss_percentage:.2f}%**. Consider optimizing your costs or pricing.")
+elif profit_loss_percentage < 20:
+    st.info(f"📊 **Moderate Margin**: Your profit margin is **{profit_loss_percentage:.2f}%**. Room for improvement!")
 else:
-    st.success("✅ **Healthy Profit Margin** - Great job! Your pricing is competitive")
+    st.success(f"✅ **Healthy Margin**: Excellent! Your profit margin is **{profit_loss_percentage:.2f}%**")
 
 # Footer
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #9ca3af; padding: 1rem;'>"
-    "Built with Streamlit | 📦 E-Commerce Calculator v2.0"
+    "📦 E-Commerce Profit Calculator | Built with Streamlit"
     "</div>",
     unsafe_allow_html=True
 )
