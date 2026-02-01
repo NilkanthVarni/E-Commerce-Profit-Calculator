@@ -77,7 +77,7 @@ def get_exchange_rate(from_currency="INR", to_currency="USD"):
     except Exception as e:
         return None, None, False
 
-# Fallback rates (in case API fails) - Base: INR
+# Fallback rates (suggested defaults for manual entry) - Base: INR
 FALLBACK_RATES = {
     "INR": 1.0,
     "USD": 0.012,
@@ -99,39 +99,71 @@ st.markdown("---")
 # Currency Selection
 st.markdown("### 💱 Currency")
 currency = st.selectbox(
-    "Select your currency (all calculations will use live exchange rates from INR)",
+    "Select your currency (all calculations will use exchange rates from INR)",
     AVAILABLE_CURRENCIES,
     index=0,  # Default to INR
-    help="INR is the base currency. If you select another currency, live exchange rates will be fetched."
+    help="INR is the base currency. If you select another currency, exchange rates will be used."
 )
 
 # Get exchange rate
+use_manual_rate = False
 if currency == "INR":
     exchange_rate = 1.0
     rate_status = "live"
     last_update = datetime.now().strftime("%Y-%m-%d")
 else:
-    exchange_rate, last_update, rate_status = get_exchange_rate("INR", currency)
+    # Try to fetch live rate
+    api_rate, last_update, rate_status = get_exchange_rate("INR", currency)
     
-    # Use fallback if API fails
-    if not rate_status:
-        exchange_rate = FALLBACK_RATES.get(currency, 1.0)
-        rate_status = "fallback"
-        last_update = "Offline"
-
-# Display exchange rate info
-if currency != "INR":
-    st.markdown(f"""
-    <div class="exchange-rate-box">
-        <strong>💹 Exchange Rate:</strong> 1 INR = {exchange_rate:.6f} {currency}<br>
-        <small>📅 Last updated: {last_update} | 
-        {'✅ Live rate' if rate_status == 'live' else '⚠️ Using fallback rate (API unavailable)'}</small>
-    </div>
-    """, unsafe_allow_html=True)
+    if rate_status:
+        # API success - show live rate with option to use manual
+        st.markdown(f"""
+        <div class="exchange-rate-box">
+            <strong>💹 Live Exchange Rate:</strong> 1 INR = {api_rate:.6f} {currency}<br>
+            <small>📅 Last updated: {last_update} | ✅ Fetched from API</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_refresh, col_manual_toggle = st.columns([1, 2])
+        with col_refresh:
+            if st.button("🔄 Refresh Rate"):
+                st.cache_data.clear()
+                st.rerun()
+        with col_manual_toggle:
+            use_manual_rate = st.checkbox("📝 Enter rate manually instead", value=False)
+        
+        if not use_manual_rate:
+            exchange_rate = api_rate
+        
+    else:
+        # API failed - force manual entry
+        st.warning("⚠️ **API Unavailable** - Unable to fetch live exchange rates. Please enter the rate manually.")
+        use_manual_rate = True
     
-    if st.button("🔄 Refresh Exchange Rate"):
-        st.cache_data.clear()
-        st.rerun()
+    # Manual rate input section
+    if use_manual_rate:
+        st.markdown("### 💱 Manual Exchange Rate Entry")
+        
+        # Provide helpful context
+        col_help1, col_help2 = st.columns(2)
+        with col_help1:
+            st.info("💡 **Find current rates at:**\n- [Google](https://www.google.com/search?q=INR+to+" + currency + ")\n- [XE.com](https://www.xe.com/)")
+        with col_help2:
+            default_rate = FALLBACK_RATES.get(currency, 0.012)
+            st.caption(f"**Suggested default:** 1 INR ≈ {default_rate:.6f} {currency}\n(This is an approximate value)")
+        
+        manual_rate = st.number_input(
+            f"📊 Enter exchange rate: 1 INR = ? {currency}",
+            min_value=0.000001,
+            max_value=1000.0,
+            value=FALLBACK_RATES.get(currency, 0.012),
+            step=0.000001,
+            format="%.6f",
+            help=f"Enter how many {currency} equals 1 INR"
+        )
+        exchange_rate = manual_rate
+        
+        st.success(f"✅ Using manual rate: **1 INR = {exchange_rate:.6f} {currency}**")
 
 st.markdown("---")
 
@@ -351,7 +383,7 @@ with analysis_col3:
 # Formula explanation
 with st.expander("📐 Calculation Formula"):
     st.markdown(f"""
-    **All calculations are done in INR and converted to {currency} using live exchange rate:**
+    **All calculations are done in INR and converted to {currency} using exchange rate:**
     
     **Exchange Rate:** 1 INR = {exchange_rate:.6f} {currency}
     
@@ -390,7 +422,7 @@ st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #9ca3af; padding: 1rem;'>"
     "📦 E-Commerce Profit Calculator | Built with Streamlit<br>"
-    "<small>Base Currency: INR | Live exchange rates powered by exchangerate-api.com</small>"
+    "<small>Base Currency: INR | Exchange rates: Live API or Manual Entry</small>"
     "</div>",
     unsafe_allow_html=True
 )
