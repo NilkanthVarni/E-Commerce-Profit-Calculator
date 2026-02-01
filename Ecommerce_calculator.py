@@ -50,6 +50,13 @@ st.markdown("""
         border-radius: 0.5rem;
         margin: 1rem 0;
     }
+    .results-currency-box {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -91,6 +98,28 @@ FALLBACK_RATES = {
     "AED": 0.044
 }
 
+# Initialize session state for exchange rates cache
+if 'exchange_rates_cache' not in st.session_state:
+    st.session_state.exchange_rates_cache = {}
+
+def get_or_fetch_rate(target_currency):
+    """Get exchange rate from cache or fetch new one"""
+    if target_currency == "INR":
+        return 1.0, datetime.now().strftime("%Y-%m-%d"), True
+    
+    # Check cache first
+    if target_currency in st.session_state.exchange_rates_cache:
+        return st.session_state.exchange_rates_cache[target_currency]
+    
+    # Fetch new rate
+    rate, date, success = get_exchange_rate("INR", target_currency)
+    if success:
+        st.session_state.exchange_rates_cache[target_currency] = (rate, date, success)
+        return rate, date, success
+    else:
+        # Return fallback
+        return FALLBACK_RATES.get(target_currency, 0.012), "Manual", False
+
 # Header
 st.title("📦 E-Commerce Profit Calculator")
 st.markdown("**Professional profit/loss calculator for e-commerce businesses**")
@@ -128,6 +157,7 @@ else:
         with col_refresh:
             if st.button("🔄 Refresh Rate"):
                 st.cache_data.clear()
+                st.session_state.exchange_rates_cache.clear()
                 st.rerun()
         with col_manual_toggle:
             use_manual_rate = st.checkbox("📝 Enter rate manually instead", value=False)
@@ -286,12 +316,72 @@ profit_loss_inr = selling_price_inr - total_cost_inr
 profit_loss_percentage = (profit_loss_inr / selling_price_inr * 100) if selling_price_inr > 0 else 0
 profit_multiple = profit_loss_inr / base_price_inr if base_price_inr > 0 else 0
 
-# Convert back to selected currency for display
+# Convert back to input currency for display
 total_cost = total_cost_inr * exchange_rate
 profit_loss = profit_loss_inr * exchange_rate
 
 # Results Section
 st.markdown("## 📊 Profit/Loss Analysis")
+
+# Results Currency Selector
+st.markdown("### 💱 View Results In")
+col_currency, col_button = st.columns([3, 1])
+
+with col_currency:
+    display_currency = st.selectbox(
+        "Select currency for results display",
+        AVAILABLE_CURRENCIES,
+        index=AVAILABLE_CURRENCIES.index(currency),
+        help="Choose any currency to see your profit/loss analysis"
+    )
+
+with col_button:
+    if display_currency != "INR":
+        if st.button("🔄 Refresh", key="refresh_display"):
+            st.session_state.exchange_rates_cache.clear()
+            st.rerun()
+
+# Get display currency exchange rate
+if display_currency != currency:
+    display_rate, display_date, display_status = get_or_fetch_rate(display_currency)
+    
+    # Show exchange rate info
+    if display_status:
+        st.markdown(f"""
+        <div class="results-currency-box">
+            <strong>📊 Display Rate:</strong> 1 INR = {display_rate:.6f} {display_currency}<br>
+            <small>Converting all results to {display_currency} for display</small>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.warning(f"⚠️ Using fallback rate for {display_currency}. Results may not be accurate.")
+        
+        # Manual rate input for display currency
+        use_manual_display = st.checkbox(f"📝 Enter {display_currency} rate manually", value=False, key="manual_display")
+        if use_manual_display:
+            manual_display_rate = st.number_input(
+                f"Enter rate: 1 INR = ? {display_currency}",
+                min_value=0.000001,
+                max_value=1000.0,
+                value=FALLBACK_RATES.get(display_currency, 0.012),
+                step=0.000001,
+                format="%.6f",
+                key="manual_display_rate"
+            )
+            display_rate = manual_display_rate
+            st.success(f"✅ Using manual rate: **1 INR = {display_rate:.6f} {display_currency}**")
+else:
+    display_rate = exchange_rate
+
+# Convert all values to display currency
+total_cost_display = total_cost_inr * display_rate
+selling_price_display = selling_price_inr * display_rate
+profit_loss_display = profit_loss_inr * display_rate
+base_price_display = base_price_inr * display_rate
+delivery_charge_display = delivery_charge_inr * display_rate
+total_tariff_display = total_tariff_amount_inr * display_rate
+
+st.markdown("---")
 
 # Main metrics in colored boxes
 col1, col2, col3 = st.columns(3)
@@ -299,29 +389,29 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.metric(
         label="💸 Total Cost",
-        value=f"{total_cost:.2f} {currency}",
+        value=f"{total_cost_display:.2f} {display_currency}",
         help="Base Price + Delivery + Tariffs"
     )
-    if currency != "INR":
+    if display_currency != "INR":
         st.caption(f"₹{total_cost_inr:.2f} INR")
 
 with col2:
     st.metric(
         label="💰 Selling Price",
-        value=f"{selling_price:.2f} {currency}"
+        value=f"{selling_price_display:.2f} {display_currency}"
     )
-    if currency != "INR":
+    if display_currency != "INR":
         st.caption(f"₹{selling_price_inr:.2f} INR")
 
 with col3:
     profit_color = "normal" if profit_loss >= 0 else "inverse"
     st.metric(
         label="📈 Profit/Loss",
-        value=f"{profit_loss:.2f} {currency}",
+        value=f"{profit_loss_display:.2f} {display_currency}",
         delta=f"{profit_loss_percentage:.2f}%",
         delta_color=profit_color
     )
-    if currency != "INR":
+    if display_currency != "INR":
         st.caption(f"₹{profit_loss_inr:.2f} INR")
 
 # Detailed breakdown
@@ -332,28 +422,29 @@ breakdown_col1, breakdown_col2 = st.columns(2)
 
 with breakdown_col1:
     st.markdown("**Cost Components:**")
-    st.write(f"• Base Product Price: **{base_price:.2f} {currency}**")
-    if currency != "INR":
+    st.write(f"• Base Product Price: **{base_price_display:.2f} {display_currency}**")
+    if display_currency != "INR":
         st.write(f"  (₹{base_price_inr:.2f} INR)")
     
-    st.write(f"• Delivery Charges: **{delivery_charge:.2f} {currency}**")
-    if currency != "INR":
+    st.write(f"• Delivery Charges: **{delivery_charge_display:.2f} {display_currency}**")
+    if display_currency != "INR":
         st.write(f"  (₹{delivery_charge_inr:.2f} INR)")
     
-    st.write(f"• Total Custom Duties: **{total_tariff_amount:.2f} {currency}**")
-    if currency != "INR":
+    st.write(f"• Total Custom Duties: **{total_tariff_display:.2f} {display_currency}**")
+    if display_currency != "INR":
         st.write(f"  (₹{total_tariff_amount_inr:.2f} INR)")
     
-    st.markdown(f"**Total Cost: {total_cost:.2f} {currency}**")
-    if currency != "INR":
+    st.markdown(f"**Total Cost: {total_cost_display:.2f} {display_currency}**")
+    if display_currency != "INR":
         st.markdown(f"**(₹{total_cost_inr:.2f} INR)**")
 
 with breakdown_col2:
     st.markdown("**Tariff Route:**")
     for i, leg in enumerate(tariff_legs):
+        leg_display = leg['amount_inr'] * display_rate
         st.write(f"• Leg {i+1}: {leg['from']} → {leg['to']}")
-        st.write(f"  {leg['percentage']}% = {leg['amount']:.2f} {currency}")
-        if currency != "INR":
+        st.write(f"  {leg['percentage']}% = {leg_display:.2f} {display_currency}")
+        if display_currency != "INR":
             st.write(f"  (₹{leg['amount_inr']:.2f} INR)")
 
 # Profit Analysis
@@ -365,8 +456,8 @@ analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
 with analysis_col1:
     profit_class = "profit-positive" if profit_loss >= 0 else "profit-negative"
     st.markdown(f"**Profit/Loss Amount:**")
-    st.markdown(f"<div class='{profit_class}'>{profit_loss:+.2f} {currency}</div>", unsafe_allow_html=True)
-    if currency != "INR":
+    st.markdown(f"<div class='{profit_class}'>{profit_loss_display:+.2f} {display_currency}</div>", unsafe_allow_html=True)
+    if display_currency != "INR":
         st.markdown(f"<div style='font-size: 0.9rem; color: #6b7280;'>₹{profit_loss_inr:+.2f} INR</div>", unsafe_allow_html=True)
 
 with analysis_col2:
@@ -383,20 +474,21 @@ with analysis_col3:
 # Formula explanation
 with st.expander("📐 Calculation Formula"):
     st.markdown(f"""
-    **All calculations are done in INR and converted to {currency} using exchange rate:**
+    **All calculations are done in INR and converted to {display_currency} for display:**
     
-    **Exchange Rate:** 1 INR = {exchange_rate:.6f} {currency}
+    **Input Currency Exchange Rate:** 1 INR = {exchange_rate:.6f} {currency}
+    **Display Currency Exchange Rate:** 1 INR = {display_rate:.6f} {display_currency}
     
     ```
     Total Cost (INR) = Base Price + Delivery + Custom Duties
     Total Cost (INR) = ₹{base_price_inr:.2f} + ₹{delivery_charge_inr:.2f} + ₹{total_tariff_amount_inr:.2f}
     Total Cost (INR) = ₹{total_cost_inr:.2f}
-    Total Cost ({currency}) = {total_cost:.2f} {currency}
+    Total Cost ({display_currency}) = {total_cost_display:.2f} {display_currency}
     
     Profit/Loss (INR) = Selling Price - Total Cost
     Profit/Loss (INR) = ₹{selling_price_inr:.2f} - ₹{total_cost_inr:.2f}
     Profit/Loss (INR) = ₹{profit_loss_inr:.2f}
-    Profit/Loss ({currency}) = {profit_loss:.2f} {currency}
+    Profit/Loss ({display_currency}) = {profit_loss_display:.2f} {display_currency}
     
     Profit Percentage = (Profit/Loss ÷ Selling Price) × 100
     Profit Percentage = (₹{profit_loss_inr:.2f} ÷ ₹{selling_price_inr:.2f}) × 100 = {profit_loss_percentage:.2f}%
@@ -409,7 +501,7 @@ with st.expander("📐 Calculation Formula"):
 # Recommendations
 st.markdown("---")
 if profit_loss < 0:
-    st.error(f"⚠️ **Loss Alert**: You're losing **{abs(profit_loss):.2f} {currency}** (₹{abs(profit_loss_inr):.2f}) per unit. Consider increasing your selling price or reducing costs.")
+    st.error(f"⚠️ **Loss Alert**: You're losing **{abs(profit_loss_display):.2f} {display_currency}** (₹{abs(profit_loss_inr):.2f}) per unit. Consider increasing your selling price or reducing costs.")
 elif profit_loss_percentage < 10:
     st.warning(f"💡 **Low Margin**: Your profit margin is only **{profit_loss_percentage:.2f}%**. Consider optimizing your costs or pricing.")
 elif profit_loss_percentage < 20:
@@ -422,7 +514,7 @@ st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #9ca3af; padding: 1rem;'>"
     "📦 E-Commerce Profit Calculator | Built with Streamlit<br>"
-    "<small>Base Currency: INR | Exchange rates: Live API or Manual Entry</small>"
+    "<small>Base Currency: INR | Multi-Currency Support with Live/Manual Exchange Rates</small>"
     "</div>",
     unsafe_allow_html=True
 )
