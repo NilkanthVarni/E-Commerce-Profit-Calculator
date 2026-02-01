@@ -1,15 +1,15 @@
 # 📦 E-Commerce Profit Calculator
 
-A powerful Streamlit web app for calculating e-commerce profits with multi-currency support, multiple courier options, multi-leg tariff calculations, and AI-powered pricing recommendations.
+A powerful Streamlit web app for calculating e-commerce profits with multi-currency support, multiple courier options, and percentage-based multi-leg tariff calculations.
 
 ## ✨ Features
 
 - **Multi-Currency Support**: Calculate costs in 10+ major currencies (USD, EUR, GBP, INR, JPY, CNY, AUD, CAD, SGD, AED)
 - **Flexible Weight Units**: Input weight in grams or kilograms
 - **7 Courier Services**: Including India Post (most budget-friendly), DHL, FedEx, UPS, Aramex, TNT, and EMS
+- **Percentage-Based Tariffs**: Real-world customs duty calculations based on product value
 - **Multi-Leg Tariff Calculation**: Handle complex shipping routes (e.g., China → India → USA)
 - **Real-Time Profit/Loss Analysis**: Instant calculations with visual metrics
-- **AI Pricing Recommendations**: Claude AI suggests optimal pricing based on your costs
 - **Clean, Modern UI**: Built with Streamlit for a professional look
 
 ## 🚀 Quick Start (Local Testing)
@@ -45,14 +45,6 @@ streamlit run ecommerce_calculator.py
 5. Click "Deploy"
 6. Wait 2-3 minutes for deployment
 
-### Step 3: Get Your Anthropic API Key
-
-1. Visit [console.anthropic.com](https://console.anthropic.com/)
-2. Sign up for a free account (includes $5 free credit)
-3. Navigate to "API Keys"
-4. Create a new key
-5. Copy the key and paste it in the app's sidebar
-
 That's it! Your calculator is now live and accessible to anyone! 🎉
 
 ## 📖 How to Use
@@ -68,12 +60,13 @@ That's it! Your calculator is now live and accessible to anyone! 🎉
    - Select courier service
    - India Post recommended for budget-friendly shipping
 
-3. **Tariffs & Duties**:
+3. **Tariffs & Duties** (Percentage-Based):
    - Set number of transit legs (e.g., 2 for China → India → USA)
    - For each leg, enter:
      - From country
      - To country
-     - Tariff amount and currency
+     - Tariff percentage (% of product base price)
+   - Example: If product costs $100 and tariff is 15%, duty = $15
 
 4. **Selling Price**:
    - Enter your intended selling price and currency
@@ -83,15 +76,16 @@ That's it! Your calculator is now live and accessible to anyone! 🎉
    - Profit/loss amount and percentage
    - Profit margin status (color-coded)
 
-### AI Recommendations
+### Understanding Percentage-Based Tariffs
 
-1. Go to "AI Recommendations" tab
-2. Click "Get AI Pricing Suggestion"
-3. Receive personalized advice on:
-   - Recommended selling price range
-   - Optimal profit margins
-   - Competitive positioning
-   - Risk assessment
+**Real-world example:**
+- **Product**: Smartphone at ¥500 CNY (~$69 USD)
+- **Route**: China → India → USA
+  - China to India: 18% tariff = $12.42
+  - India to USA: 25% tariff = $17.25
+- **Total Tariffs**: $29.67
+
+This reflects how actual customs duties work - they're calculated as a percentage of the product value, not fixed amounts.
 
 ## 💰 Courier Services Comparison
 
@@ -119,33 +113,27 @@ Courier costs are calculated per kg with progressive pricing:
 - 5-10 kg: Base rate × 1.2
 - 10+ kg: Base rate × 1.3
 
+### Tariff Calculations
+
+Tariffs are calculated as **percentages of the product base price**:
+- Each leg's tariff = Product Price × (Tariff % / 100)
+- All tariffs are converted to USD for total cost calculation
+- Reflects real-world customs duty practices
+
 ## 🎯 Example Use Case
 
 **Scenario**: You're selling electronics from China to USA via India
 
 - **Product**: Smartphone
-- **Base Price**: ¥500 CNY
+- **Base Price**: ¥500 CNY (~$69 USD)
 - **Weight**: 200 grams
-- **Route**: China → India (₹800 tariff) → USA ($50 tariff)
-- **Courier**: India Post
+- **Route**: 
+  - China → India (18% tariff = $12.42)
+  - India → USA (25% tariff = $17.25)
+- **Courier**: India Post ($0.55 for 0.2kg)
+- **Total Cost**: $69 + $0.55 + $29.67 = $99.22
 - **Selling Price**: $150 USD
-
-The calculator will:
-1. Convert all currencies to USD
-2. Calculate shipping (India Post, 0.2 kg)
-3. Add multi-leg tariffs
-4. Show your profit/loss and margin
-5. AI suggests optimal pricing
-
-## 🤖 About AI Integration
-
-The app uses Claude Sonnet 4 for intelligent pricing recommendations. Claude analyzes:
-- Your cost structure
-- Current profit margins
-- Market positioning
-- Competitive factors
-
-All processing happens securely via Anthropic's API.
+- **Profit**: $50.78 (33.9% margin)
 
 ## 📱 Browser Compatibility
 
@@ -159,9 +147,9 @@ Mobile-responsive design works great on phones and tablets!
 
 ## 🔐 Privacy & Security
 
-- Your API key is only stored in your browser session
+- No external API calls required
+- All calculations happen locally in your browser
 - No data is saved or transmitted to third parties
-- All calculations happen in real-time
 - Streamlit Cloud hosting is secure and HTTPS-enabled
 
 ## 📄 License
@@ -171,8 +159,8 @@ Free to use and modify for personal and commercial purposes.
 ## 🆘 Support
 
 Having issues? Check:
-1. API key is correctly entered
-2. All required fields are filled
+1. All required fields are filled
+2. Tariff percentages are entered correctly (0-100%)
 3. Browser is up to date
 
 ## 🌟 Future Enhancements
@@ -184,9 +172,23 @@ Planned features:
 - Custom courier rate configuration
 - Real-time currency rate updates via API
 - Multi-language support
+- Save/load product configurations
+
+## 💡 Common Tariff Rates by Country
+
+Here are some typical customs duty rates to help you get started:
+
+- **USA**: 0-25% (varies by product category)
+- **India**: 10-100% (electronics typically 18-25%)
+- **China**: 0-35%
+- **EU**: 0-17%
+- **UK**: 0-12%
+- **Australia**: 5-10%
+
+*Note: Rates vary by product type and trade agreements. Check official customs websites for accurate rates.*
 
 ---
 
-**Built with ❤️ using Streamlit and Claude AI**
+**Built with ❤️ using Streamlit**
 
 Enjoy calculating your profits! 📈
